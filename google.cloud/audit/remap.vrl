@@ -1,0 +1,70 @@
+.ocsf.metadata.version = "1.3.0"
+.ocsf.metadata.product.vendor_name = "Google"
+
+.ocsf.category_uid = 6
+.ocsf.category_name = "Application Activity"
+
+.ocsf.class_uid = 6003
+.ocsf.class_name = "API Activity"
+
+.ocsf.activity_id = 99
+.ocsf.activity_name = .message.protoPayload.methodName || .message.protoPayload.metadata.event[0].eventName || "Other"
+
+.ocsf.severity = del(.message.severity)
+
+if (.ocsf.severity == "NOTICE" ) {
+    .ocsf.severity = "Informational"
+    .ocsf.severity_id = 1
+} else {
+    .ocsf.severity_id = 99
+}
+
+.ocsf.type_uid = .ocsf.class_uid * 100 + .ocsf.activity_id
+.ocsf.type = join!([.ocsf.class_name, "Other"], separator: ": ")
+
+
+.ocsf.time_dt = del(.message.timestamp)
+ts, _ = parse_timestamp(.ocsf.time_dt, format: "%+")
+
+.ocsf.time = to_unix_timestamp(ts, unit: "milliseconds")
+
+
+.ocsf.metadata.uid = del(.message.insertId)
+
+productname = del(.message.protoPayload."@type")
+
+.ocsf.metadata.product.name, _ = replace(productname, "type.googleapis.com/", "", count: 1)
+
+.ocsf.metadata.log_provider = del(.message.logName)
+.ocsf.metadata.profiles = ["cloud", "datetime"]
+
+.ocsf.cloud.provider = "GCP"
+.ocsf.cloud.org.uid, err = split(.ocsf.metadata.log_provider, "/")[1]
+
+.ocsf.actor.user.uid = del(.message.protoPayload.authenticationInfo.principalEmail)
+.ocsf.actor.user.email_addr = .ocsf.actor.user.uid
+
+resourcename = del(.message.protoPayload.resourceName)
+resourcedata = del(.message.resource)
+
+.ocsf.resources = [{ "name" : resourcename, "data": resourcedata }]
+
+.ocsf.api.service.name = del(.message.protoPayload.serviceName)
+.ocsf.api.operation = del(.message.protoPayload.methodName) || .message.protoPayload.metadata.event[0].eventName
+
+.ocsf.api.request.uid = del(.message.protoPayload.metadata.event[0].eventId) || "unknown"
+
+request = del(.message.protoPayload.request)  || del(.message.protoPayload.metadata.event)
+
+.ocsf.api.response.data = del(.message.protoPayload.response)
+
+.ocsf.src_endpoint.ip = del(.message.protoPayload.requestMetadata.callerIp)
+
+if (is_null(.ocsf.src_endpoint.ip)) {
+    .ocsf.src_endpoint.uid = "unknown"
+}
+
+.ocsf.http_request.user_agent = del(.message.protoPayload.requestMetadata.callerSuppliedUserAgent)
+
+.ocsf.unmapped = encode_json(compact!(.message, string: true, array: true, null: true, nullish: true))
+. = compact(.ocsf, string: true, array: true, null: true, nullish: true)

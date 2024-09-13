@@ -1,0 +1,57 @@
+
+.ocsf.metadata.version = "1.3.0"
+.ocsf.metadata.product.vendor_name = "Wiz"
+.ocsf.metadata.product.feature.name = "issue"
+
+.ocsf.uid = del(.message.id)
+.ocsf.time = to_unix_timestamp(now())
+
+.ocsf.category_uid = 2
+.ocsf.category_name = "Findings"
+.ocsf.class_uid = 2002
+.ocsf.class_name = "Vulnerability Finding"
+.ocsf.activity_name = "Create"
+.ocsf.activity_id = 1
+.ocsf.type_uid = 200201
+.ocsf.type_name = "Vulnerability Finding: Create"
+.ocsf.finding_info.severity_id = 99
+.ocsf.finding_info.severity = del(.message.score)
+
+
+.ocsf.finding_info.uid = .ocsf.uid
+.ocsf.finding_info.title = del(.message.sourceRule.name)
+.ocsf.finding_info.src_url = del(.message.portalUrl)
+.ocsf.status_detail = del(.message.status)
+
+.ocsf.first_seen_time = del(.message.firstDetectedAt)
+.ocsf.last_seen_time = del(.message.lastDetectedAt)
+
+.ocsf.vulnerabilities = []
+.ocsf.vulnerabilities[0] = {}
+.ocsf.vulnerabilities[0].cve = del(.message.name)
+.ocsf.vulnerabilities[0].desc = del(.message.CVEDescription)
+.ocsf.vulnerabilities[0].severity = del(.message.CVSSSeverity)
+.ocsf.vulnerabilities[0].remediation = {}
+.ocsf.vulnerabilities[0].remediation.desc = del(.message.remediation)
+.ocsf.vulnerabilities[0].remediation.references = [del(.message.link)]
+
+.ocsf.vulnerabilities[0].affected_packages = [{}]
+.ocsf.vulnerabilities[0].affected_packages[0].name = del(.message.detailedName)
+.ocsf.vulnerabilities[0].affected_packages[0].fixed_in_version = del(.message.fixedVersion)
+.ocsf.vulnerabilities[0].is_exploit_available = del(.message.hasExploit)
+
+.ocsf.resources = []
+.ocsf.observables = []
+
+rscid = del(.message.entitySnapshot.providerId)
+
+if (!is_null(rscid)) {
+    rsc = {
+          "value": rscid,
+          "name": del(.message.entitySnapshot.nativeType)
+      }
+      .ocsf.observables = push(.ocsf.observables, rsc)
+}
+
+.ocsf.unmapped = encode_json(compact!(.message, string: true, array: true, null: true, nullish: true))
+. = compact(.ocsf, string: true, array: true, null: true, nullish: true)

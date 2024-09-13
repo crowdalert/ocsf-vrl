@@ -1,0 +1,117 @@
+.ocsf.metadata.version = "1.3.0"
+.ocsf.metadata.product.vendor_name = "Github"
+
+.ocsf.time = del(.message."@timestamp") || to_unix_timestamp(now())
+
+.ocsf.category_uid = 6
+.ocsf.category_name = "Application Activity"
+
+.ocsf.class_uid = 6003
+.ocsf.class_name = "API Activity"
+
+.ocsf.severity_id = 1
+.ocsf.severity = "Informational"
+
+.ocsf.metadata.uid = del(.message._document_id)
+.ocsf.metadata.product.name = "audit"
+.ocsf.metadata.profiles = ["cloud", "datetime"]
+.ocsf.metadata.logged_time = del(.message.created_at)
+
+operation_type = del(.message.operation_type) || .meta.headers."x-github-event"
+
+action_repr = .message.action
+
+if operation_type == "create" {
+  .ocsf.activity_id = 1
+  .ocsf.activity = "Create"
+} else if (operation_type == "access" || .message.action == "git.clone" || .message.action == "git.fetch") {
+  .ocsf.activity_id = 2
+  .ocsf.activity = "Read"
+} else if operation_type == "modify" {
+  .ocsf.activity_id = 3
+  .ocsf.activity = "Update"
+} else if operation_type == "remove" {
+  .ocsf.activity_id = 3
+  .ocsf.activity = "Delete"
+} else if (is_null(operation_type) && is_null(.message.action))  {
+  .ocsf.activity_id = 0
+  .ocsf.activity = "Unknown"
+} else {
+  .ocsf.activity_id = 99
+  if !is_null(operation_type) {
+    if !is_null(.message.action) {
+      .ocsf.activity = to_string!(operation_type) + "." + to_string!(.message.action)
+    } else {
+      .ocsf.activity = operation_type
+    }
+  } else {
+    .ocsf.activity = .message.action || "Other"
+  }
+  action_repr = .ocsf.activity
+}
+
+.ocsf.type_uid = .ocsf.class_uid * 100 + .ocsf.activity_id
+if (.ocsf.activity_id == 99) {
+    .ocsf.type_name = join!([.ocsf.class_name, "Other"], separator: ": ")
+} else {
+    .ocsf.type_name = join!([.ocsf.class_name, .ocsf.activity], separator: ": ")
+}
+
+.ocsf.api.operation = del(.message.action)
+.ocsf.api.service.name = del(.message.repository.full_name) || del(.message.repository)
+.ocsf.api.group.name = del(.meta.headers."x-github-event")
+
+if (to_bool!(del(.message.repository_public))) {
+    .ocsf.api.service.labels = ["public"]
+}
+
+.ocsf.cloud.account.uid, _ = to_string(del(.message.business_id))
+.ocsf.cloud.account.name = del(.message.business)
+.ocsf.cloud.org.name = del(.message.org)
+.ocsf.cloud.org.uid, _ = to_string(del(.message.org_id))
+
+is_bot = del(.message.actor_is_bot)
+
+if (to_bool!(is_bot)) {
+  .ocsf.actor.user.type = "System"
+  .ocsf.actor.user.type_id = 3
+} else {
+  .ocsf.actor.user.type_id = 99
+  .ocsf.actor.user.type = "github"
+}
+
+.ocsf.actor.user.uid = del(.message.actor) || del(.message.user.login) || del(.message.sender.login)
+
+uid_alt = del(.message.actor_id) || del(.message.sender.id)
+
+.ocsf.actor.user.uid_alt, _ = to_string(uid_alt)
+
+.ocsf.actor.user.email_addr = del(.message.pusher.email) || del(.message.external_identity_nameid) || del(.message.external_identity_username)
+.ocsf.actor.user.full_name = del(.message.pusher.name)
+
+.ocsf.actor.session.issuer = del(.message.programmatic_access_type)
+.ocsf.actor.session.credential_uid, _ = to_string(del(.message.token_id))
+
+.ocsf.http_request.user_agent = del(.message.user_agent)
+
+.ocsf.src_endpoint.location.country = del(.message.actor_location.country_code)
+.ocsf.src_endpoint.ip = del(.message.actor_ip)
+if (is_null(.ocsf.src_endpoint.ip)) {
+  .ocsf.src_endpoint.uid = "unknown"
+}
+
+user = to_string!(.ocsf.actor.user.email_addr || .ocsf.actor.user.full_name || .ocsf.actor.user.uid)
+
+repo = del(.message.repo)
+action = to_string!(action_repr)
+
+if (repo != null) {
+  repo = to_string!(repo)
+  .ocsf.resources = [{"name": repo, "type": "repository"}]
+}
+
+unmapped, _ = compact(.message, string: true, array: true, null: true, nullish: true)
+if (!is_null(unmapped) && !is_empty(unmapped)) {
+  .ocsf.unmapped = encode_json(unmapped)
+}
+. = compact(.ocsf, string: true, array: true, null: true, nullish: true)
