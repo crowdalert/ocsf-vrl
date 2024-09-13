@@ -12,7 +12,9 @@ Welcome to the OCSF VRL Remaps Collection! This project is a set of [VRL (Vector
 ## Introduction
 
 [VRL](https://vector.dev/docs/reference/vrl) is a powerful language for data transformation and remapping with a fast, Rust-based interpreter, shipped as part of the [Vector](https://vector.dev) data collection pipeline
+
 [pyVRL](https://github.com/crowdalert/pyvrl) integrates VRL with Python natively, obviating the need for Vector & exposing it to any python-based data pipeline
+
 [OCSF](https://ocsf.io) is an open-source normalization schema for security data analytics supported by several large data & security vendors.
 
 This collection provides a variety of VRL remap programs that can be used to transform data from raw vendor security log sources in to OCSF
@@ -48,7 +50,9 @@ python remap.py aws/cloudtrail/remap.vrl cloudtrail.json
 
 ## Contributing
 
-We welcome contributions! If you have a remap that you think would be useful to others or changes to better fit the OCSF schema please submit a pull request. Make sure to include a description of what your remap does and any necessary documentation.
+We welcome contributions!
+
+If you have a remap that you think would be useful to others or changes to better fit the OCSF schema please submit a pull request. Make sure to include a description of what your remap does and any necessary documentation.
 
 ## License
 
