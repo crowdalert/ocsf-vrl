@@ -24,7 +24,7 @@ def main(vrl_file: str, input_file: str) -> str:
         print(f'{input_file} is not valid JSON')
         exit(1)
 
-    remapped = transform.remap({'message': data})
+    remapped = transform.remap(data)
 
     return json.dumps(remapped)
 

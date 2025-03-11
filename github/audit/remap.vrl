@@ -1,117 +1,120 @@
-.ocsf.metadata.version = "1.3.0"
-.ocsf.metadata.product.vendor_name = "Github"
+# NOTE:
+#  Github audit log streaming stores meaningful information
+#  in the x-github-* headers
+#
+#  This remap assumes data from a Vector `http_server` source,
+#  with the `headers` option including `x-github-*` (or
+#  any other matching wildcard)
+#
+#  If this is not the case, you'll need to coerce the relevant
+#  headers in to %http_server.headers (eg, Event.metadata_full)
 
-.ocsf.time = del(.message."@timestamp") || to_unix_timestamp(now())
+%ocsf = true
 
-.ocsf.category_uid = 6
-.ocsf.category_name = "Application Activity"
+ocsf = {"metadata": {"version": "1.3.0",
+                     "product": {"vendor_name":"Github",
+                                 "name": "audit"},
+                     "profiles": ["cloud","datetime"]},
+        "category_uid": 6,
+        "category_name": "Application Activity",
+        "class_uid": 6003,
+        "class_name": "API Activity",
+        "severity_id": 1,
+        "severity": "Informational"}
 
-.ocsf.class_uid = 6003
-.ocsf.class_name = "API Activity"
+ocsf.metadata.uid = del(._document_id)
+ocsf.metadata.logged_time = del(.created_at)
 
-.ocsf.severity_id = 1
-.ocsf.severity = "Informational"
+ocsf.time = del(."@timestamp") || to_unix_timestamp(now())
 
-.ocsf.metadata.uid = del(.message._document_id)
-.ocsf.metadata.product.name = "audit"
-.ocsf.metadata.profiles = ["cloud", "datetime"]
-.ocsf.metadata.logged_time = del(.message.created_at)
-
-operation_type = del(.message.operation_type) || .meta.headers."x-github-event"
-
-action_repr = .message.action
+op = del(.operation_type) || %http_server.headers."x-github-event"
+operation_type, _ = to_string(op)
 
 if operation_type == "create" {
-  .ocsf.activity_id = 1
-  .ocsf.activity = "Create"
-} else if (operation_type == "access" || .message.action == "git.clone" || .message.action == "git.fetch") {
-  .ocsf.activity_id = 2
-  .ocsf.activity = "Read"
+  ocsf.activity_id = 1
+  ocsf.activity = "Create"
+} else if (operation_type == "access" || .action == "git.clone" || .action == "git.fetch") {
+  ocsf.activity_id = 2
+  ocsf.activity = "Read"
 } else if operation_type == "modify" {
-  .ocsf.activity_id = 3
-  .ocsf.activity = "Update"
+  ocsf.activity_id = 3
+  ocsf.activity = "Update"
 } else if operation_type == "remove" {
-  .ocsf.activity_id = 3
-  .ocsf.activity = "Delete"
-} else if (is_null(operation_type) && is_null(.message.action))  {
-  .ocsf.activity_id = 0
-  .ocsf.activity = "Unknown"
+  ocsf.activity_id = 3
+  ocsf.activity = "Delete"
+} else if (is_nullish(operation_type) && is_null(.action))  {
+  ocsf.activity_id = 0
+  ocsf.activity = "Unknown"
 } else {
-  .ocsf.activity_id = 99
+  ocsf.activity_id = 99
   if !is_null(operation_type) {
-    if !is_null(.message.action) {
-      .ocsf.activity = to_string!(operation_type) + "." + to_string!(.message.action)
+    if (!is_null(.action) && is_string(.action)) {
+      ocsf.activity = operation_type "." + to_string!(.action)
     } else {
-      .ocsf.activity = operation_type
+      ocsf.activity = operation_type
     }
   } else {
-    .ocsf.activity = .message.action || "Other"
+    ocsf.activity = .action || "Other"
   }
-  action_repr = .ocsf.activity
 }
 
-.ocsf.type_uid = .ocsf.class_uid * 100 + .ocsf.activity_id
-if (.ocsf.activity_id == 99) {
-    .ocsf.type_name = join!([.ocsf.class_name, "Other"], separator: ": ")
+ocsf.type_uid = ocsf.class_uid * 100 + ocsf.activity_id
+if (ocsf.activity_id == 99) {
+    ocsf.type_name = "API Activity: Other"
 } else {
-    .ocsf.type_name = join!([.ocsf.class_name, .ocsf.activity], separator: ": ")
+    ocsf.type_name, _ = join([ocsf.class_name, ocsf.activity], separator: ": ")
 }
 
-.ocsf.api.operation = del(.message.action)
-.ocsf.api.service.name = del(.message.repository.full_name) || del(.message.repository)
-.ocsf.api.group.name = del(.meta.headers."x-github-event")
+ocsf.api = {"operation": del(.action),
+             "service": {"name": del(.repository.full_name) || del(.repository)},
+             "group": {"name": del(.meta.headers."x-github-event")}}
 
-if (to_bool!(del(.message.repository_public))) {
-    .ocsf.api.service.labels = ["public"]
+
+public = to_bool(del(.repository_public)) ?? false
+if (public) {
+    ocsf.api.service.labels = ["public"]
 }
 
-.ocsf.cloud.account.uid, _ = to_string(del(.message.business_id))
-.ocsf.cloud.account.name = del(.message.business)
-.ocsf.cloud.org.name = del(.message.org)
-.ocsf.cloud.org.uid, _ = to_string(del(.message.org_id))
+ocsf.cloud = {"account": {"uid": to_string(del(.business_id)) ?? null,
+                          "name": del(.business)},
+              "org": {"name": del(.org),
+                      "uid": to_string(del(.org_id)) ?? null}}
 
-is_bot = del(.message.actor_is_bot)
+is_bot = to_bool(del(.actor_is_bot)) ?? false
 
-if (to_bool!(is_bot)) {
-  .ocsf.actor.user.type = "System"
-  .ocsf.actor.user.type_id = 3
+if (is_bot) {
+  ocsf.actor = {"user": {"type": "System", "type_id": 3}}
 } else {
-  .ocsf.actor.user.type_id = 99
-  .ocsf.actor.user.type = "github"
+  ocsf.actor = {"user": {"type": "github", "type_id": 99}}
 }
 
-.ocsf.actor.user.uid = del(.message.actor) || del(.message.user.login) || del(.message.sender.login)
+uid_alt = del(.actor_id) || del(.sender.id)
 
-uid_alt = del(.message.actor_id) || del(.message.sender.id)
+ocsf.actor.user.uid_alt, _ = to_string(uid_alt)
+ocsf.actor.user.email_addr = del(.pusher.email) || del(.external_identity_nameid) || del(.external_identity_username)
+ocsf.actor.user.full_name = del(.pusher.name)
+ocsf.actor.user.uid = del(.actor) || del(.user.login) || del(.sender.login)
 
-.ocsf.actor.user.uid_alt, _ = to_string(uid_alt)
+ocsf.actor.session = {"issuer": del(.programmatic_access_type),
+                      "credential_uid": to_string(del(.token_id)) ?? null}
 
-.ocsf.actor.user.email_addr = del(.message.pusher.email) || del(.message.external_identity_nameid) || del(.message.external_identity_username)
-.ocsf.actor.user.full_name = del(.message.pusher.name)
+ocsf.http_request = {"user_agent": del(.user_agent)}
 
-.ocsf.actor.session.issuer = del(.message.programmatic_access_type)
-.ocsf.actor.session.credential_uid, _ = to_string(del(.message.token_id))
+ocsf.src_endpoint = {"location": {"country": del(.actor_location.country_code)}, "ip": del(.actor_ip)}
 
-.ocsf.http_request.user_agent = del(.message.user_agent)
-
-.ocsf.src_endpoint.location.country = del(.message.actor_location.country_code)
-.ocsf.src_endpoint.ip = del(.message.actor_ip)
-if (is_null(.ocsf.src_endpoint.ip)) {
-  .ocsf.src_endpoint.uid = "unknown"
+if (is_null(ocsf.src_endpoint.ip)) {
+  ocsf.src_endpoint.uid = "unknown"
 }
 
-user = to_string!(.ocsf.actor.user.email_addr || .ocsf.actor.user.full_name || .ocsf.actor.user.uid)
-
-repo = del(.message.repo)
-action = to_string!(action_repr)
-
-if (repo != null) {
-  repo = to_string!(repo)
-  .ocsf.resources = [{"name": repo, "type": "repository"}]
+if (!is_null(.repo)) {
+  repo, _ = to_string(del(.repo))
+  ocsf.resources = [{"name": repo, "type": "repository"}]
 }
 
-unmapped, _ = compact(.message, string: true, array: true, null: true, nullish: true)
+unmapped, _ = compact(., string: true, array: true, null: true, nullish: true)
+
 if (!is_null(unmapped) && !is_empty(unmapped)) {
-  .ocsf.unmapped = encode_json(unmapped)
+  ocsf.unmapped = encode_json(unmapped)
 }
-. = compact(.ocsf, string: true, array: true, null: true, nullish: true)
+
+. = compact(ocsf, string: true, array: true, null: true, nullish: true, recursive: true)

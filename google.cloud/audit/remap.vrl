@@ -1,70 +1,64 @@
-.ocsf.metadata.version = "1.3.0"
-.ocsf.metadata.product.vendor_name = "Google"
+%ocsf = true
 
-.ocsf.category_uid = 6
-.ocsf.category_name = "Application Activity"
+ocsf = {"metadata": {"version": "1.3.0"
+                     "product": {"vendor_name": "Google"}},
+        "category_uid": 6,
+        "category_name", "Application Activity",
+        "class_uid": 6003,
+        "class_name": "API Activity",
+        "activity_id": 99,
+        "type_uid": 600399,
+        "type": "API Activity: Other",
+        "profiles: ["cloud", "datetime"]}
 
-.ocsf.class_uid = 6003
-.ocsf.class_name = "API Activity"
+ocsf.time_dt = del(.timestamp)
+ts = parse_timestamp(ocsf.time_dt, format: "%+") ?? now()
+ocsf.time = to_unix_timestamp(ts)
 
-.ocsf.activity_id = 99
-.ocsf.activity_name = .message.protoPayload.methodName || .message.protoPayload.metadata.event[0].eventName || "Other"
 
-.ocsf.severity = del(.message.severity)
+ocsf.activity_name = .protoPayload.methodName || .protoPayload.metadata.event[0].eventName || "Other"
 
-if (.ocsf.severity == "NOTICE" ) {
-    .ocsf.severity = "Informational"
-    .ocsf.severity_id = 1
+ocsf.severity = del(.severity)
+
+if (ocsf.severity == "NOTICE" ) {
+    ocsf.severity = "Informational"
+    ocsf.severity_id = 1
 } else {
-    .ocsf.severity_id = 99
+    ocsf.severity_id = 99
 }
 
-.ocsf.type_uid = .ocsf.class_uid * 100 + .ocsf.activity_id
-.ocsf.type = join!([.ocsf.class_name, "Other"], separator: ": ")
+ocsf.metadata.uid = del(.insertId)
 
+productname = del(.protoPayload."@type")
 
-.ocsf.time_dt = del(.message.timestamp)
-ts, _ = parse_timestamp(.ocsf.time_dt, format: "%+")
+ocsf.metadata.product.name, _ = replace(productname, "type.googleapis.com/", "", count: 1)
 
-.ocsf.time = to_unix_timestamp(ts, unit: "milliseconds")
+ocsf.metadata.log_provider = del(.logName)
 
+orguid, _ = split(ocsf.metadata.log_provider, "/")[1]
+ocsf.cloud = {"provider": "GCP", "org":{"uid": orguid}}
 
-.ocsf.metadata.uid = del(.message.insertId)
+ocsf.actor = {"user": {"uid": del(.protoPayload.authenticationInfo.principalEmail)}}
+ocsf.actor.user.email_addr = ocsf.actor.user.uid
 
-productname = del(.message.protoPayload."@type")
+ocsf.resources = [{ "name": del(.protoPayload.resourceName), "data": del(.resource) }]
 
-.ocsf.metadata.product.name, _ = replace(productname, "type.googleapis.com/", "", count: 1)
+ocsf.api = {"service": {"name": del(.protoPayload.serviceName)},
+            "operation": del(.protoPayload.methodName) || .protoPayload.metadata.event[0].eventName,
+            "request": {"uid": del(.protoPayload.metadata.event[0].eventId) || "unknown"},
+            "response": {"data": del(.protoPayload.response)}}
 
-.ocsf.metadata.log_provider = del(.message.logName)
-.ocsf.metadata.profiles = ["cloud", "datetime"]
+ocsf.src_endpoint = {"ip": del(.protoPayload.requestMetadata.callerIp)}
 
-.ocsf.cloud.provider = "GCP"
-.ocsf.cloud.org.uid, err = split(.ocsf.metadata.log_provider, "/")[1]
-
-.ocsf.actor.user.uid = del(.message.protoPayload.authenticationInfo.principalEmail)
-.ocsf.actor.user.email_addr = .ocsf.actor.user.uid
-
-resourcename = del(.message.protoPayload.resourceName)
-resourcedata = del(.message.resource)
-
-.ocsf.resources = [{ "name" : resourcename, "data": resourcedata }]
-
-.ocsf.api.service.name = del(.message.protoPayload.serviceName)
-.ocsf.api.operation = del(.message.protoPayload.methodName) || .message.protoPayload.metadata.event[0].eventName
-
-.ocsf.api.request.uid = del(.message.protoPayload.metadata.event[0].eventId) || "unknown"
-
-request = del(.message.protoPayload.request)  || del(.message.protoPayload.metadata.event)
-
-.ocsf.api.response.data = del(.message.protoPayload.response)
-
-.ocsf.src_endpoint.ip = del(.message.protoPayload.requestMetadata.callerIp)
-
-if (is_null(.ocsf.src_endpoint.ip)) {
-    .ocsf.src_endpoint.uid = "unknown"
+if (is_null(ocsf.src_endpoint.ip)) {
+    ocsf.src_endpoint.uid = "unknown"
 }
 
-.ocsf.http_request.user_agent = del(.message.protoPayload.requestMetadata.callerSuppliedUserAgent)
+ocsf.http_request = {"user_agent": del(.protoPayload.requestMetadata.callerSuppliedUserAgent)}
 
-.ocsf.unmapped = encode_json(compact!(.message, string: true, array: true, null: true, nullish: true))
-. = compact(.ocsf, string: true, array: true, null: true, nullish: true)
+unmapped, _ = compact(., string: true, array: true, null: true, nullish: true)
+if (!is_null(unmapped) && !is_empty(unmapped)) {
+  ocsf.unmapped = encode_json(unmapped)
+}
+
+. = compact(ocsf, string: true, array: true, null: true, nullish: true)

@@ -31,8 +31,6 @@ vrl --file remaps/example_remap.vrl --input data/input.json --output data/output
 
 or use [pyVRL](https://github.com/crowdalert/pyvrl) to integrate these transforms in to your Python pipeline.
 
-( **note:** *Like Vector's `remap`, programs expect log data in a Python dict value under a `message` key* )
-
 A command-line utility (`remap.py`) is included as an example & can be used instead of the `vrl` command:
 
 install dependencies:
