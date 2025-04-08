@@ -11,8 +11,8 @@ ocsf = {"metadata": {"version": "1.3.0",
         "severity_id": 1,
         "severity": "Informational",
         "resources": [],
-        "observables": []}
-
+        "observables": [],
+        "raw_data": encode_json(.)}
 
 ocsf.time_dt = del(.eventTime)
 ts = parse_timestamp(ocsf.time_dt, format: "%+") ?? now()
@@ -26,7 +26,8 @@ ocsf.metadata.event_code = del(.eventType)
 ocsf.cloud = {"provider": "AWS",
               "region": del(.awsRegion)}
 
-ocsf.api = {"operation": del(.eventName) || "unknown"}
+eventName = del(.eventName) || "unknown"
+ocsf.api = {"operation": string(eventName) ?? "unknown"}
 
 if (del(.readOnly) == true || starts_with(ocsf.api.operation, "Describe") || starts_with(ocsf.api.operation, "List")) {
   ocsf.activity_id = 3
@@ -121,7 +122,7 @@ if (is_array(resources)) {
 
 if (ocsf.activity_id == 1) {
   tgt = slice(ocsf.api.operation, 6) ?? ""
-  tgtarn = downcase!(tgt) + "arn"
+  tgtarn = downcase(tgt) + "arn"
   rk = keys(.responseElements) ?? []
   rv, _ = get(.responseElements, rk)
   rv = object(rv) ?? object({})

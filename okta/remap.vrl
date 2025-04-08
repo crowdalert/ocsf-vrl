@@ -1,12 +1,14 @@
 %ocsf = true
 
-ocsf = {"metadata": {"version": "1.3.0",
+ocsf = {"metadata": {"uid": uuid_v7(),
+                     "version": "1.3.0",
                      "product": {"vendor_name": "Okta",
                                  "name": "Okta System Log"}},
         "category_uid": 3,
         "category_name": "Identity & Access Management",
         "class_uid": 3002,
-        "class_name": "Authentication"}
+        "class_name": "Authentication",
+        "raw_data": encode_json(.)}
 
 ocsf.time_dt = del(.published)
 ts = parse_timestamp(ocsf.time_dt, format: "%+") ?? now()
